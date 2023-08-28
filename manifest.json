@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Echo",
+  "version": "1.0",
+
+  "description": "An extension that can parse Narcissus. Echo is a nymph cursed to only repeat the words spoken to her, embodying unrequited love and the loss of her own voice.",
+
+  "icons": {
+    "48": "icons/echo-48.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["echo.js"]
+    }
+  ]
+}
+
