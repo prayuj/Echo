@@ -1,32 +1,58 @@
-const ALERT_REGEX = /^\s*alert\s+'([^0-9']+)'/;
-const TIMEOUT_REGEX = /^\s*in\s+(\d+)\s+seconds\s+do\s+(.+)/;
+// (async function(){
+//   const fileURL = browser.runtime.getURL('narcissus/lib/' + 'options' + '.js');
+//   const response = await fetch(fileURL);
+//   const text = await response.text();
+//   console.log(text);
+// })();
+(async function(envGlobal) {
 
-function customInterpreter(code) {
-    const lines = code.split(';');
+  var moduleNames = [
+      "options",
+      "definitions",
+      "lexer",
+      "parser",
+      "decompiler",
+      "resolver",
+      "desugaring",
+      "bytecode",
+      "interpreter"
+  ];
 
-    for (const line of lines) {
-      console.log({line})
-        if (line.match(ALERT_REGEX)) {
-            const message = line.match(ALERT_REGEX);
-            if (message && message[1]) {
-              alert(message[1]);
-            }
-          }
-        else if (line.match(TIMEOUT_REGEX)) {
-            const match = line.match(TIMEOUT_REGEX)
-            const seconds = parseInt(match[1]);
-            const command = match[2];
-            console.log(seconds, command);
-            setTimeout(customInterpreter.bind(this, command.trim()), seconds * 1000);
-        }
-    }
+  const moduleSources = [];
+
+  for (let index = 0; index < moduleNames.length; index++) {
+    const moduleName = moduleNames[index];
+    const fileURL = browser.runtime.getURL('narcissus/lib/' + moduleName + '.js');
+    const response = await fetch(fileURL);
+    const text = await response.text();
+    moduleSources.push(text);
   }
 
-const narcissusTags = document.querySelectorAll('script[type="text/narcissus"]');
+  var evalWithLocation = envGlobal.evalWithLocation || function evalWithLocation(src) {
+      return (0,eval)(src);
+  };
 
-for (let index = 0; index < narcissusTags.length; index++) {
+  // // defines the init function in this local scope
+  // var init = evalWithLocation(fs.readFileSync(path.join(__dirname, './init.js'), 'utf-8'), "init.js", 1);
+
+  const fileURL = browser.runtime.getURL('narcissus/init.js');
+  const response = await fetch(fileURL);
+  const text = await response.text();
+
+  const init = evalWithLocation(text, 'init.js', 1);
+
+  envGlobal.Narcissus = init(moduleNames, moduleSources, evalWithLocation, envGlobal);
+  console.log(envGlobal.Narcissus.interpreter.evaluate(''))
+  start();
+
+})(window);
+
+function start(){
+  const narcissusTags = document.querySelectorAll('script[type="text/narcissus"]');
+
+  for (let index = 0; index < narcissusTags.length; index++) {
     const script = narcissusTags[index];
     const lines = script.text.trim();
-    customInterpreter(lines);
+    Narcissus.interpreter.evaluate(lines);
+  }
 }
-
