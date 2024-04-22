@@ -233,6 +233,7 @@ for (var i = 0, j = tokens.length; i < j; i++) {
     tokenIds[name] = i;
     tokens[t] = i;
 }
+// console.log({tokens});
 consts += ";";
 
 var isStatementStartCode = {__proto__: null};
@@ -282,7 +283,10 @@ function defineProperty(obj, prop, val, dontDelete, readOnly, dontEnum) {
 // Returns true if fn is a native function.  (Note: SpiderMonkey specific.)
 function isNativeCode(fn) {
     // Relies on the toString method to identify native code.
-    return ((typeof fn) === "function") && fn.toString().match(/\[native code\]/);
+    console.log('Native CODE!!!', fn.toString(), typeof fn, (typeof fn) === "function")
+    var matcher = fn.toString().match(/\[native code\]/)
+    || fn.toString().match(/\[object HTMLDocument]/);
+    return /*((typeof fn) === "function") && */ matcher;
 }
 
 var Fpapply = Function.prototype.apply;
@@ -347,7 +351,7 @@ function getOwnProperties(obj) {
 function blacklistHandler(target, blacklist) {
     var mask = Object.create(null, {});
     var redirect = Dict.create(blacklist).mapObject(function(name) { return mask; });
-    console.log("creating blacklist handler:", {keys: Object.keys(target)});
+    // console.log("creating blacklist handler:", {keys: Object.keys(target)});
     return mixinHandler(redirect, target);
 }
 
@@ -376,6 +380,8 @@ function whitelistHandler(target, whitelist) {
  */
 
 function mixinHandler(redirect, catchall) {
+
+    console.log({redirect, catchall})
     function targetFor(name) {
         var result = hasOwn(redirect, name) ? redirect[name] : catchall
         return result;
@@ -430,7 +436,8 @@ function mixinHandler(redirect, catchall) {
         // hasOwn: hasMux, deprecated
         get: function(receiver, name) {
             var target = targetFor(name);
-            console.log("target[name]:", target[name]);
+            // console.log("name:", name);
+            // console.log("target[name]:", target[name]);
             return target[name];
         },
         set: function(receiver, name, val) {
@@ -481,12 +488,14 @@ function makePassthruHandler(obj) {
         // }, deprecated
 
         has: function(target, name) {
-            console.log("name in obj:", name in obj);
+            // console.log("name in obj:", name in obj);
             return name in obj;
         },
         // hasOwn: function(name) { return ({}).hasOwnProperty.call(obj, name); }, deprecated
         get: function(target, name) {
-            console.log("obj[name]:", obj[name]);
+            // console.log("name:", name);
+            // console.log("obj:", obj);
+            // console.log("obj[name]:", obj[name]);
             return obj[name];
         },
 

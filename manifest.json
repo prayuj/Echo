@@ -9,9 +9,15 @@
     "48": "icons/echo-48.png"
   },
 
+  "browser_action": {
+    "default_icon": "icons/echo-48.png",
+    "default_title": "Echo",
+    "default_popup": "popup/index.html"
+  },
+
   "content_scripts": [
     {
-      "matches": ["*://*/*"],
+      "matches": ["*://127.0.0.1/*", "file:///Users/prayujpillai/Code/Echo/index.html"],
       "js": ["echo.js"]
     }
   ]

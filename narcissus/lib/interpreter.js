@@ -126,8 +126,8 @@ var globalBase = {
     // a dummy formal parameter.
     Function: function Function(dummy) {
 
-        console.log("fn this", this);
-        console.log("fn arguments", arguments);
+        // console.log("fn this", this);
+        // console.log("fn arguments", arguments);
         var p = "", b = "", n = arguments.length;
         if (n) {
             var m = n - 1;
@@ -191,44 +191,44 @@ var globalBase = {
     assertEq: function() {
         return hostGlobalAssertEq.apply(null, arguments);
     },
-    balakalava: function() {
-        console.log('balakalava');
-    }
 };
 
-// function wrapNative(name, val) {
-//     if (!definitions.isNativeCode(val))
-//         return val;
-//     console.log('is natve code');
-//     console.log("wrapNative:", {name, val});
+function wrapNative(name, val) {
+    console.log({name, val});
+    return val;
+    // if (!definitions.isNativeCode(val))
+    //     return val;
+    // console.log('is natve code');
+    // console.log("wrapNative:", {name, val});
 
-//     const handler = {
-//         apply(target, thisArg, argumentsList) {
-//           // Intercept function invocation
-//           return val.apply(hostGlobal, argumentsList);
-//         },
-//         construct(target, argumentsList, newTarget) {
-//           // Intercept constructor invocation
-//           return applyNew(val, argumentsList);
-//         },
-//         ...definitions.makePassthruHandler(val),
-//       };
+    // const handler = {
+    //     apply(target, thisArg, argumentsList) {
+    //       // Intercept function invocation
+    //       return val.apply(hostGlobal, argumentsList);
+    //     },
 
-//     return new Proxy({}, handler);
-// }
+    //     construct(target, argumentsList, newTarget) {
+    //       // Intercept constructor invocation
+    //       return applyNew(val, argumentsList);
+    //     },
+    //     ...definitions.makePassthruHandler(val),
+    //   };
+
+    // return new Proxy(val, handler);
+}
 
 var hostHandler = definitions.blacklistHandler(hostGlobal, options.hiddenHostGlobals);
-// var hostHandlerGet = hostHandler.get;
-// hostHandler.get = function(receiver, name) {
-//     var originalGetResp = hostHandlerGet(receiver, name);
-//     return wrapNative(name, originalGetResp);
-// };
+var hostHandlerGet = hostHandler.get;
+hostHandler.get = function(receiver, name) {
+    var originalGetResp = hostHandlerGet(receiver, name);
+    return wrapNative(name, originalGetResp);
+};
 var hostProxy = new Proxy({}, hostHandler);
 
 var globalStaticEnv;                       // global static scope
 var moduleInstances = new WeakMap();       // maps module instance objects -> module instances
 var global = Object.create(hostProxy, {}); // user global object
-// console.log("global.eval: ", global.eval);
+
 function resetEnvironment() {
     ExecutionContext.current = new ExecutionContext(GLOBAL_CODE);
     let names;
@@ -254,11 +254,8 @@ function resetEnvironment() {
 var hostGlobalArray = hostGlobal.Array;
 var hostGlobalFunction = hostGlobal.Function;
 var hostGlobalAssertEq = hostGlobal.assertEq;
-var hostGlobalAlert = hostGlobal.alert;
 
 resetEnvironment();
-// a = new Function('a', 'b', 'return a + b');
-// console.log(a.toString());
 
 // Helper to avoid Object.prototype.hasOwnProperty polluting scope objects.
 function hasDirectProperty(o, p) {
@@ -320,6 +317,7 @@ Reference.prototype.toString = function () {
 }
 
 function getValue(v) {
+    // console.log("v instanceof Reference: " + v instanceof Reference);
     if (v instanceof Reference) {
         if (!v.base) {
             // Hook needed for Zaphod
@@ -969,12 +967,14 @@ function execute(n, x) {
         a = execute(c[1], x);
         f = getValue(r);
         x.staticEnv = n.staticEnv;
-        if (typeof f !== "function") {
-            throw new TypeError(r + " is not callable", c[0].filename, c[0].lineno);
-        }
+
+        // if (typeof f !== "function") {
+        //     throw new TypeError(r + " is not callable", c[0].filename, c[0].lineno);
+        // }
         t = (r instanceof Reference) ? r.base : null;
         if (t instanceof Activation)
             t = null;
+        // console.log({f, t, a, x});
         v = call(f, t, a, x);
         break;
 
@@ -1189,6 +1189,7 @@ function getOwnProperties(obj) {
 function newFunction(n, x) {
     var fint = new FunctionInternals(n, x.scope);
     console.log({n, x});
+    console.log({Fp});
     var props = Object.create(Fp);
     definitions.defineProperty(props, "length", fint.length, false, false, true);
     definitions.defineProperty(props, "toString", function() {
@@ -1202,8 +1203,11 @@ function newFunction(n, x) {
         construct(target, argumentsList, newTarget) {
             return fint.construct(target, argumentsList, x);
         },
+        foo: function() {
+            console.log("bar");
+        }
     };
-    var p = new Proxy(fint. handler);
+    var p = new Proxy(fint, handler);
     functionInternals.set(p, fint);
     var proto = {};
     definitions.defineProperty(p, "prototype", proto, true);
@@ -1232,9 +1236,59 @@ function hasInstance(u, v) {
 
 function call(f, t, a, x) {
     var fint = functionInternals.get(f);
-    if (!fint)
-        return f.apply(t, a);
+    if (!fint) {
+        let result = f.apply(t, a);
+        result = taintCheckInputs(result); // If input being checked, pass through taint checker
+        return result;
+    }
     return fint.call(f, t, a, x);
+}
+
+function taintCheckInputs(result) {
+    if(result?.__proto__?.toString() === "[object HTMLInputElement]" || result?.__proto__?.toString() === "[object HTMLTextAreaElement]") {
+        if (result.isTainted === undefined) {
+            result.isTainted = function () {
+                result.__taint = false;
+                if (arguments.length > 0 && typeof arguments[0] === "boolean")
+                    result.taint = arguments[0] === true;
+                return result.__taint
+            };
+            result.sanitize = function (customSanitizer) {
+                if (customSanitizer) return customSanitizer(this.unsafe_value);
+                var regex = /document\.cookies/g;
+                var value = this.unsafe_value;
+                var sanitizedValue = value.replace(regex, 'Sanitized Out!');
+                return sanitizedValue;
+            }
+            return new Proxy(result, {
+                get: function(target, prop) {
+                    if (prop === 'unsafe_value') {
+                        return target['value'];
+                    }
+                    if (prop === '__taint') {
+                        throw new Error('Accessing __taint property is forbidden. Use isTainted() instead.');
+                    }
+                    if (prop === 'value' && target.isTainted()) {
+                        throw new Error('Cannot get value from input element with tainted input. Try HTMLInputElement.unsafe_value to get unsafe value');
+                    }
+                    return Reflect.get(...arguments);
+                },
+                set: function(target, prop, value) {
+                    if (prop === '__taint') {
+                        throw new Error('Modifying __taint property is forbidden. Use isTainted() instead.');
+                    }
+                    if (prop === 'isTaint') {
+                        throw new Error('Modifying isTaint() is forbidden.');
+                    }
+                    if (prop === 'value') {
+                        target.isTainted(true);
+                    }
+                    return Reflect.set(...arguments);
+                }
+            });
+        }
+    }
+    return result;
 }
 
 function construct(f, a, x) {

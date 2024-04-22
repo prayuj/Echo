@@ -4,14 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sample Narcissus Program</title>
+    <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <div id = "style-me">
-        This is a sample div
+    <div class="editor-container">
+        <div class="editor-header">
+            <h1>JavaScript Evaluator</h1>
+        </div>
+        <div class="editor">
+            <textarea id="code" placeholder="Enter your code here..." spellcheck="false">
+
+
+            </textarea>
+            <button id="run">Click to Run</button>
+            <div id="output">Output:</div>
+        </div>
     </div>
     <script type="text/narcissus">
-        var div = document.querySelector('#style-me');
-        div.style.border = '10px solid yellow';
+        var button = document.getElementById('button');
+        button.onclick = function() {
+            var textInputElem = document.getElementById('code');
+            if (textInputElem.isTainted()){
+                try {
+                    console.log("textInputElem.value: " + textInputElem.value);
+                } catch (e) {
+                    console.warn (e) ;
+                }
+            }
+            textInputElem.isTainted(false);
+            const val = textInputElem.value;
+            const result = globalWindow.eval(val);
+            document.getElementById('code').textContent = result;
+        }
     </script>
 </body>
 </html>
